@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Configure the client ip and port
-    getsockname(srv_socket_descript, (struct sockaddr *) &srv_address, (socklen_t *) &srv_addr_len);
+    getsockname(srv_socket_descript, (struct sockaddr *) &srv_address, &srv_addr_len);
     printf("Server started on %s:%d\n", inet_ntoa(srv_address.sin_addr), ntohs(srv_address.sin_port));
 
 }
