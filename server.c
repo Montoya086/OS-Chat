@@ -8,8 +8,10 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+#include "client-node.h"
 
-int srv_socket_descript = 0;
+int srv_socket_descript = 0, cli_socket_descript = 0;
+CNode *root_usr = NULL, *current_usr = NULL;
 
 void exit_service(int sig) {
     printf("\nShutting down...\n");
@@ -73,19 +75,25 @@ int main(int argc, char *argv[]) {
     printf("Server started on %s:%d\n", inet_ntoa(srv_address.sin_addr), ntohs(srv_address.sin_port));
 
     // Create the root node of the tree, this will be the server
+    root_usr = create_node(srv_socket_descript, inet_ntoa(srv_address.sin_addr));
 
+    // Set the current user to the root user
+    current_usr = root_usr;
 
     // Accept the incoming connections
     while(1){
-        int cli_socket_descript = accept(srv_socket_descript, (struct sockaddr *) &client_address, (socklen_t *) &cli_addr_len);
+        // Accept the incoming connection
+        cli_socket_descript = accept(srv_socket_descript, (struct sockaddr *) &client_address, (socklen_t *) &cli_addr_len);
         if (cli_socket_descript == -1) {
             printf("Accepting connection failed!\n");
             exit(EXIT_FAILURE);
         } else {
-            printf("Connection accepted!\n");
+            printf("Accepted connection from %s:%d\n", inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port));
         }
+
+        // Create a new node for the client
+        CNode *new_usr = create_node(cli_socket_descript, inet_ntoa(client_address.sin_addr));
 
         
     }
-
 }
