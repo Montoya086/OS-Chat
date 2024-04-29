@@ -72,4 +72,20 @@ int main(int argc, char *argv[]) {
     getsockname(srv_socket_descript, (struct sockaddr *) &srv_address, &srv_addr_len);
     printf("Server started on %s:%d\n", inet_ntoa(srv_address.sin_addr), ntohs(srv_address.sin_port));
 
+    // Create the root node of the tree, this will be the server
+
+
+    // Accept the incoming connections
+    while(1){
+        int cli_socket_descript = accept(srv_socket_descript, (struct sockaddr *) &client_address, (socklen_t *) &cli_addr_len);
+        if (cli_socket_descript == -1) {
+            printf("Accepting connection failed!\n");
+            exit(EXIT_FAILURE);
+        } else {
+            printf("Connection accepted!\n");
+        }
+
+        
+    }
+
 }
