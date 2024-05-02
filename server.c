@@ -24,6 +24,8 @@ void exit_service(int signal) {
     CNode *to_free;
     // While there are users in the list, close the connection and free the memory
     while (root_usr) {
+        // Close the connection
+        close(root_usr->data);
         printf("Connection closed for %s\n", root_usr->ip);
         // Save the node to free
         to_free = root_usr;
@@ -32,7 +34,10 @@ void exit_service(int signal) {
         // Free the memory of saved node
         free(to_free);
     }
+    // Close the server socket
+    close(srv_socket_descript);
     pthread_mutex_destroy(&status_mutex);
+    pthread_mutex_destroy(&client_mutex);
     printf("\nShutting down...\n");
     exit(EXIT_SUCCESS);
 }
@@ -165,6 +170,13 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     } else{
         printf("Socket created successfully!\n");
+    }
+
+    int yes = 1;
+    // Set the socket options for reusing the port and avoiding the "Address already in use" error
+    if (setsockopt(srv_socket_descript, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+        perror("setsockopt SO_REUSEADDR failed");
+        exit(EXIT_FAILURE);
     }
 
     // Save the server address and client address
