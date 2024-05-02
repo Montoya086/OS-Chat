@@ -14,6 +14,7 @@
 #include <time.h>
 
 pthread_mutex_t status_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t client_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int srv_socket_descript = 0;
 CNode *root_usr = NULL, *current_usr = NULL;
@@ -23,8 +24,6 @@ void exit_service(int signal) {
     CNode *to_free;
     // While there are users in the list, close the connection and free the memory
     while (root_usr) {
-        // Close the connection
-        close(root_usr->data);
         printf("Connection closed for %s\n", root_usr->ip);
         // Save the node to free
         to_free = root_usr;
@@ -33,6 +32,7 @@ void exit_service(int signal) {
         // Free the memory of saved node
         free(to_free);
     }
+    pthread_mutex_destroy(&status_mutex);
     printf("\nShutting down...\n");
     exit(EXIT_SUCCESS);
 }
@@ -45,7 +45,7 @@ void exit_service(int signal) {
 */
 void* status_service(void *client_node) {
     CNode *client = (CNode *) client_node;
-    while(1) {
+    while(client->active) {
         if(client->status != CHAT__USER_STATUS__BUSY) {
             if((clock()-client->last_seen)/CLOCKS_PER_SEC > MAX_INACTIVE_TIME) {
                 // Block the mutex while changing the status
@@ -56,6 +56,44 @@ void* status_service(void *client_node) {
             }
         }
     }
+    return NULL;
+}
+
+void print_users() {
+    CNode *current = root_usr;
+    while(current) {
+        printf("User: %s\n", current->name);
+        current = current->linked_to;
+    }
+}
+
+/*
+* Remove client service function
+* @param to_remove: the client node to remove
+* @return: void
+* This function will be used to remove the client from the list
+*/
+void remove_client_service(CNode *to_remove) {
+    // Block the mutex while removing the client
+    pthread_mutex_lock(&client_mutex);
+    if (to_remove->linked_from) {
+        to_remove->linked_from->linked_to = to_remove->linked_to;
+    }
+    if (to_remove->linked_to) {
+        to_remove->linked_to->linked_from = to_remove->linked_from;
+        if(to_remove == current_usr) {
+            current_usr = to_remove->linked_from;
+        }
+    }
+    // Close the connection
+    close(to_remove->data);
+    // Change the status to inactive to stop the status service 
+    to_remove->active = 0; 
+    printf("Connection closed for %s\n", to_remove->name);
+    // Free the memory
+    free(to_remove); 
+    // Unlock the mutex
+    pthread_mutex_unlock(&client_mutex);
 }
 
 /*
@@ -65,13 +103,39 @@ void* status_service(void *client_node) {
 * This function will be used to handle the client service and actions
 */
 void* client_service(void *client_node) {
+    // initialize the status mutex
+    pthread_mutex_init(&status_mutex, NULL);
+    // Cast the client node
+    CNode *client = (CNode *) client_node;
+    // Create a new thread for the status service
     pthread_t thread;
     pthread_create(&thread, NULL, status_service, client_node);
     if (pthread_detach(thread) != 0) {
         printf("Status thread creation failed!\n");
         exit(EXIT_FAILURE);
     }
-    printf("Client service started!\n");
+    
+    // Create a buffer for the username and payload
+    char username[MAX_USERNAME_LENGTH];
+    char payload_buffer[MAX_MESSAGE_LENGTH];
+
+    while(1){
+        // Await for any incoming messages
+        int raw_payload = recv(client->data, payload_buffer, MAX_MESSAGE_LENGTH, 0);
+        // Check if the message is received successfully
+        if (raw_payload == -1) {
+            printf("Receiving message failed!\n");
+            exit(EXIT_FAILURE);
+        } else if (raw_payload == 0) { // Check if the client disconnected
+            remove_client_service(client);
+            break;
+        } else {
+            printf("Received message from %s: %s\n", client->name, payload_buffer);
+            client->last_seen = clock();
+            client->status = CHAT__USER_STATUS__ONLINE;
+        }
+    }
+    return NULL;
 }
 
 /*
@@ -138,7 +202,7 @@ int main(int argc, char *argv[]) {
     printf("Server started on %s:%d\n", inet_ntoa(srv_address.sin_addr), ntohs(srv_address.sin_port));
 
     // Create the root node of the tree, this will be the server
-    root_usr = create_node(srv_socket_descript, inet_ntoa(srv_address.sin_addr));
+    root_usr = create_node(srv_socket_descript, inet_ntoa(srv_address.sin_addr), "Server");
 
     // Set the current user to the root user
     current_usr = root_usr;
@@ -155,14 +219,15 @@ int main(int argc, char *argv[]) {
         }
 
         // Create a new node for the client
-        CNode *new_usr = create_node(cli_socket_descript, inet_ntoa(client_address.sin_addr));
+        CNode *new_usr = create_node(cli_socket_descript, inet_ntoa(client_address.sin_addr), NULL);
 
         // Add the new node to the list
-        new_usr->linked_from = root_usr;
+        new_usr->linked_from = current_usr;
         current_usr->linked_to = new_usr;
         current_usr = new_usr;
 
         // Create a new thread for the client
+        pthread_mutex_init(&client_mutex, NULL);
         pthread_t thread;
         pthread_create(&thread, NULL, client_service, (void *) new_usr);
         if (pthread_detach(thread) != 0) {
