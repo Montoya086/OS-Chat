@@ -9,6 +9,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include "client-node.h"
+#include "chat.pb-c.h"
+#include "env.h"
+#include <time.h>
+
+pthread_mutex_t status_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int srv_socket_descript = 0;
 CNode *root_usr = NULL, *current_usr = NULL;
@@ -39,7 +44,18 @@ void exit_service(int signal) {
 * This function will be used to check the status of the client
 */
 void* status_service(void *client_node) {
-    
+    CNode *client = (CNode *) client_node;
+    while(1) {
+        if(client->status != CHAT__USER_STATUS__BUSY) {
+            if((clock()-client->last_seen)/CLOCKS_PER_SEC > MAX_INACTIVE_TIME) {
+                // Block the mutex while changing the status
+                pthread_mutex_lock(&status_mutex);
+                client->status = CHAT__USER_STATUS__BUSY;
+                pthread_mutex_unlock(&status_mutex);
+                printf("User %s is now busy!\n", client->name);
+            }
+        }
+    }
 }
 
 /*
@@ -154,4 +170,6 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
     }
+
+    return 0;
 }
