@@ -130,14 +130,39 @@ void* client_service(void *client_node) {
         // Check if the message is received successfully
         if (raw_payload == -1) {
             printf("Receiving message failed!\n");
-            exit(EXIT_FAILURE);
+            continue;
         } else if (raw_payload == 0) { // Check if the client disconnected
             remove_client_service(client);
             break;
+        } 
+
+        // Parse the received message
+        Chat__Request *payload = chat__request__unpack(NULL, raw_payload, payload_buffer);
+        if(payload == NULL) {
+            printf("Error unpacking message!\n");
+            continue;
         } else {
-            printf("Received message from %s: %s\n", client->name, payload_buffer);
             client->last_seen = clock();
             client->status = CHAT__USER_STATUS__ONLINE;
+        }
+
+        printf("Message of type: %d\n", payload->operation);
+
+        switch (payload->operation)
+        {
+            case CHAT__REQUEST__PAYLOAD_REGISTER_USER:
+                /* code */
+                break;
+            case CHAT__REQUEST__PAYLOAD_SEND_MESSAGE:             
+                break;
+            case CHAT__REQUEST__PAYLOAD_GET_USERS:
+                break;
+            case CHAT__REQUEST__PAYLOAD_UPDATE_STATUS:
+                break;
+            case CHAT__REQUEST__PAYLOAD_UNREGISTER_USER:
+                break;
+            default:
+                break;
         }
     }
     return NULL;
