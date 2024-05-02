@@ -10,7 +10,7 @@
 #include <string.h>
 #include "client-node.h"
 
-int srv_socket_descript = 0, cli_socket_descript = 0;
+int srv_socket_descript = 0;
 CNode *root_usr = NULL, *current_usr = NULL;
 
 void exit_service(int sig) {
@@ -18,6 +18,39 @@ void exit_service(int sig) {
     exit(EXIT_SUCCESS);
 }
 
+/*
+* Status service function
+* @param client_node: the client node
+* @return: void
+* This function will be used to check the status of the client
+*/
+void* status_service(void *client_node) {
+    
+}
+
+/*
+* Client service function
+* @param client_node: the client node
+* @return: void
+* This function will be used to handle the client service and actions
+*/
+void* client_service(void *client_node) {
+    pthread_t thread;
+    pthread_create(&thread, NULL, status_service, client_node);
+    if (pthread_detach(thread) != 0) {
+        printf("Status thread creation failed!\n");
+        exit(EXIT_FAILURE);
+    }
+    printf("Client service started!\n");
+}
+
+/*
+* Main function
+* @param argc: number of arguments
+* @param argv: arguments
+* @return: 0 if successful, 1 if failed
+* Based of https://www.geeksforgeeks.org/tcp-server-client-implementation-in-c/
+*/
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         printf("Provide a port number!\n");
@@ -83,7 +116,7 @@ int main(int argc, char *argv[]) {
     // Accept the incoming connections
     while(1){
         // Accept the incoming connection
-        cli_socket_descript = accept(srv_socket_descript, (struct sockaddr *) &client_address, (socklen_t *) &cli_addr_len);
+        int cli_socket_descript = accept(srv_socket_descript, (struct sockaddr *) &client_address, (socklen_t *) &cli_addr_len);
         if (cli_socket_descript == -1) {
             printf("Accepting connection failed!\n");
             exit(EXIT_FAILURE);
@@ -94,6 +127,17 @@ int main(int argc, char *argv[]) {
         // Create a new node for the client
         CNode *new_usr = create_node(cli_socket_descript, inet_ntoa(client_address.sin_addr));
 
-        
+        // Add the new node to the list
+        new_usr->linked_from = root_usr;
+        current_usr->linked_to = new_usr;
+        current_usr = new_usr;
+
+        // Create a new thread for the client
+        pthread_t thread;
+        pthread_create(&thread, NULL, client_service, (void *) new_usr);
+        if (pthread_detach(thread) != 0) {
+            printf("Thread creation failed!\n");
+            exit(EXIT_FAILURE);
+        }
     }
 }
