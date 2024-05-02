@@ -13,7 +13,21 @@
 int srv_socket_descript = 0;
 CNode *root_usr = NULL, *current_usr = NULL;
 
-void exit_service(int sig) {
+void exit_service(int signal) {
+    // Temporary node to free the memory after closing the connection
+    CNode *to_free;
+    // While there are users in the list, close the connection and free the memory
+    while (root_usr) {
+        // Close the connection
+        close(root_usr->data);
+        printf("Connection closed for %s\n", root_usr->ip);
+        // Save the node to free
+        to_free = root_usr;
+        // Move to the next node
+        root_usr = root_usr->linked_to;
+        // Free the memory of saved node
+        free(to_free);
+    }
     printf("\nShutting down...\n");
     exit(EXIT_SUCCESS);
 }
