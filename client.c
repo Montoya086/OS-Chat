@@ -54,6 +54,19 @@ void create_user_action(){
         printf("Receive failed!\n");
         exit(EXIT_FAILURE);
     }
+
+    Chat__Response *response = chat__response__unpack(NULL, res, res_buffer);
+    if (response == NULL) {
+        printf("Error unpacking response\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (response->status_code == CHAT__STATUS_CODE__OK) {
+        printf("Message: %s\n", response->message);
+    } else {
+        printf("Error: %s\n", response->message);
+        exit(EXIT_FAILURE);
+    }
 }
 
 /*

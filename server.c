@@ -19,6 +19,51 @@ pthread_mutex_t client_mutex = PTHREAD_MUTEX_INITIALIZER;
 int srv_socket_descript = 0;
 CNode *root_usr = NULL, *current_usr = NULL;
 
+/*
+* UTILS AREA
+*/
+
+/*
+* Reset status function
+* @param client: the client node
+* @return: void
+* This function will be used to reset the status of the client when it does an action
+*/
+void reset_status(CNode *client) {
+    // Block the mutex while changing the status
+    pthread_mutex_lock(&status_mutex);
+    client->status = CHAT__USER_STATUS__ONLINE;
+    client->last_seen = clock();
+    pthread_mutex_unlock(&status_mutex);
+}
+
+/*
+* User exists function
+* @param username: the username to check
+* @return: 1 if the user exists, 0 if not
+* This function will be used to check if the user exists in the list
+*/
+int user_exists(char *username) {
+    CNode *current = root_usr;
+    while(current) {
+        if(strcmp(current->name, username) == 0) {
+            return 1;
+        }
+        current = current->linked_to;
+    }
+    return 0;
+}
+
+/*
+* SERVICES AREA
+*/
+
+/*
+* Exit service function
+* @param signal: the signal
+* @return: void
+* This function will be used to close the server and free the memory
+*/
 void exit_service(int signal) {
     // Temporary node to free the memory after closing the connection
     CNode *to_free;
@@ -64,11 +109,61 @@ void* status_service(void *client_node) {
     return NULL;
 }
 
-void print_users() {
-    CNode *current = root_usr;
-    while(current) {
-        printf("User: %s\n", current->name);
-        current = current->linked_to;
+/*
+* Register user service function
+* @param client: the client node
+* @param username: the username to register
+* @return: void
+* This function will be used to register the user in the list
+*/
+void set_username_service(CNode *client, char *username) {
+    if (user_exists(username)) {
+        Chat__Response response = CHAT__RESPONSE__INIT;
+        response.status_code = CHAT__STATUS_CODE__BAD_REQUEST;
+        response.result_case = CHAT__RESPONSE__RESULT__NOT_SET;
+        response.message = "User already exists!";
+
+        // Serialize the response
+        size_t res_len = chat__response__get_packed_size(&response);
+        void *res_buffer = malloc(res_len);
+        if (res_buffer == NULL) {
+            printf("Memory allocation failed!\n");
+            exit(EXIT_FAILURE);
+        }
+
+        chat__response__pack(&response, res_buffer);
+
+        // Send the response
+        int bytes_sent = send(client->data, res_buffer, res_len, 0);
+        if (bytes_sent < 0) {
+            printf("Send failed!\n");
+            exit(EXIT_FAILURE);
+        }
+    } else {
+        strncpy(client->name, username, MAX_USERNAME_LENGTH);
+        printf("User %s joined the server!\n", client->name);
+
+        Chat__Response response = CHAT__RESPONSE__INIT;
+        response.status_code = CHAT__STATUS_CODE__OK;
+        response.result_case = CHAT__RESPONSE__RESULT__NOT_SET;
+        response.message = "User registered successfully!";
+
+        // Serialize the response
+        size_t res_len = chat__response__get_packed_size(&response);
+        void *res_buffer = malloc(res_len);
+        if (res_buffer == NULL) {
+            printf("Memory allocation failed!\n");
+            exit(EXIT_FAILURE);
+        }
+
+        chat__response__pack(&response, res_buffer);
+
+        // Send the response
+        int bytes_sent = send(client->data, res_buffer, res_len, 0);
+        if (bytes_sent < 0) {
+            printf("Send failed!\n");
+            exit(EXIT_FAILURE);
+        }
     }
 }
 
@@ -99,14 +194,6 @@ void remove_client_service(CNode *to_remove) {
     free(to_remove); 
     // Unlock the mutex
     pthread_mutex_unlock(&client_mutex);
-}
-
-void reset_status(CNode *client) {
-    // Block the mutex while changing the status
-    pthread_mutex_lock(&status_mutex);
-    client->status = CHAT__USER_STATUS__ONLINE;
-    client->last_seen = clock();
-    pthread_mutex_unlock(&status_mutex);
 }
 
 /*
@@ -159,9 +246,7 @@ void* client_service(void *client_node) {
         switch (payload->operation)
         {
             case CHAT__OPERATION__REGISTER_USER:
-                strncpy(client->name, payload->register_user->username, MAX_USERNAME_LENGTH);
-                printf("User %s joined the server!\n", client->name);
-
+                set_username_service(client, payload->register_user->username);
                 break;
             case CHAT__OPERATION__SEND_MESSAGE:             
                 break;
