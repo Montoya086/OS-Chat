@@ -101,6 +101,14 @@ void remove_client_service(CNode *to_remove) {
     pthread_mutex_unlock(&client_mutex);
 }
 
+void reset_status(CNode *client) {
+    // Block the mutex while changing the status
+    pthread_mutex_lock(&status_mutex);
+    client->status = CHAT__USER_STATUS__ONLINE;
+    client->last_seen = clock();
+    pthread_mutex_unlock(&status_mutex);
+}
+
 /*
 * Client service function
 * @param client_node: the client node
@@ -146,20 +154,22 @@ void* client_service(void *client_node) {
             client->status = CHAT__USER_STATUS__ONLINE;
         }
 
-        printf("Message of type: %d\n", payload->operation);
+        reset_status(client);
 
         switch (payload->operation)
         {
-            case CHAT__REQUEST__PAYLOAD_REGISTER_USER:
-                /* code */
+            case CHAT__OPERATION__REGISTER_USER:
+                strncpy(client->name, payload->register_user->username, MAX_USERNAME_LENGTH);
+                printf("User %s joined the server!\n", client->name);
+
                 break;
-            case CHAT__REQUEST__PAYLOAD_SEND_MESSAGE:             
+            case CHAT__OPERATION__SEND_MESSAGE:             
                 break;
-            case CHAT__REQUEST__PAYLOAD_GET_USERS:
+            case CHAT__OPERATION__GET_USERS:
                 break;
-            case CHAT__REQUEST__PAYLOAD_UPDATE_STATUS:
+            case CHAT__OPERATION__UPDATE_STATUS:
                 break;
-            case CHAT__REQUEST__PAYLOAD_UNREGISTER_USER:
+            case CHAT__OPERATION__UNREGISTER_USER:
                 break;
             default:
                 break;

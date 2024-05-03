@@ -6,12 +6,13 @@
 #include <string.h>
 #include <time.h>
 #include "chat.pb-c.h"
+#include "env.h"
 
 typedef struct node {
     int data;
     struct node *linked_to;
     struct node *linked_from;
-    char name[20];
+    char name[MAX_USERNAME_LENGTH];
     Chat__UserStatus status;
     char ip[16];
     clock_t last_seen;
