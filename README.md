@@ -16,3 +16,12 @@ In order to compile use the following:
 ```
 gcc <server/client>.c chat.pb-c.c -o <server/client>.o -lprotobuf-c
 ```
+In order to run the server use the following:
+```
+./server.o <port>
+```
+In order to run a client use:
+```
+./client.o <server_address> <server_port> <username>
+```
+In a local environment, <server_address> is "0.0.0.0".
