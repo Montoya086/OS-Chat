@@ -54,6 +54,17 @@ int user_exists(char *username) {
     return 0;
 }
 
+int get_user_count() {
+    CNode *current = root_usr;
+    int count = 0;
+    while(current) {
+        count++;
+        current = current->linked_to;
+    }
+    printf("User count: %d\n", count);
+    return count;
+}
+
 /*
 * SERVICES AREA
 */
@@ -140,6 +151,31 @@ void set_username_service(CNode *client, char *username) {
             exit(EXIT_FAILURE);
         }
     } else {
+        // Check if the maximum number of users is reached (+2 because the server is also a user and the new user is already added to the list)
+        if (get_user_count() >= MAX_USERS+2) {
+            Chat__Response response = CHAT__RESPONSE__INIT;
+            response.status_code = CHAT__STATUS_CODE__BAD_REQUEST;
+            response.result_case = CHAT__RESPONSE__RESULT__NOT_SET;
+            response.message = "Maximum number of users reached!";
+
+            // Serialize the response
+            size_t res_len = chat__response__get_packed_size(&response);
+            void *res_buffer = malloc(res_len);
+            if (res_buffer == NULL) {
+                printf("Memory allocation failed!\n");
+                exit(EXIT_FAILURE);
+            }
+
+            chat__response__pack(&response, res_buffer);
+
+            // Send the response
+            int bytes_sent = send(client->data, res_buffer, res_len, 0);
+            if (bytes_sent < 0) {
+                printf("Send failed!\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+
         strncpy(client->name, username, MAX_USERNAME_LENGTH);
         printf("User %s joined the server!\n", client->name);
 
@@ -167,6 +203,47 @@ void set_username_service(CNode *client, char *username) {
     }
 }
 
+void send_all_users_service() {
+    CNode *current = root_usr;
+    Chat__UserListResponse user_list = CHAT__USER_LIST_RESPONSE__INIT;
+    Chat__User **users = malloc(sizeof(Chat__User *) * MAX_USERS);
+    int i = 0;
+    while(current) {
+        Chat__User *user = malloc(sizeof(Chat__User));
+        chat__user__init(user);
+        user->username = current->name;
+        user->status = current->status;
+        users[i] = user;
+        i++;
+        current = current->linked_to;
+    }
+    user_list.n_users = i;
+    user_list.users = users;
+
+    Chat__Response response = CHAT__RESPONSE__INIT;
+    response.status_code = CHAT__STATUS_CODE__OK;
+    response.result_case = CHAT__RESPONSE__RESULT_USER_LIST;
+    response.user_list = &user_list;
+
+    // Serialize the response
+    size_t res_len = chat__response__get_packed_size(&response);
+    void *res_buffer = malloc(res_len);
+    if (res_buffer == NULL) {
+        printf("Memory allocation failed!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    chat__response__pack(&response, res_buffer);
+
+    // Send the response
+    int bytes_sent = send(current_usr->data, res_buffer, res_len, 0);
+    if (bytes_sent < 0) {
+        printf("Send failed!\n");
+        exit(EXIT_FAILURE);
+    }
+
+}
+
 /*
 * Remove client service function
 * @param to_remove: the client node to remove
@@ -178,12 +255,12 @@ void remove_client_service(CNode *to_remove) {
     pthread_mutex_lock(&client_mutex);
     if (to_remove->linked_from) {
         to_remove->linked_from->linked_to = to_remove->linked_to;
-    }
-    if (to_remove->linked_to) {
-        to_remove->linked_to->linked_from = to_remove->linked_from;
         if(to_remove == current_usr) {
             current_usr = to_remove->linked_from;
         }
+    }
+    if (to_remove->linked_to) {
+        to_remove->linked_to->linked_from = to_remove->linked_from;
     }
     // Close the connection
     close(to_remove->data);

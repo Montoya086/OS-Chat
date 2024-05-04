@@ -131,7 +131,37 @@ int main(int argc, char *argv[]){
 
     create_user_action();
 
-    while (is_connected){};
+    while (is_connected){
+        printf("Select an option:\n");
+        printf("1. Send a message\n");
+        printf("2. List users\n");
+        printf("3. Change channel\n");
+        printf("4. Change status\n");
+        printf("5. Exit\n");
+
+        int option;
+        scanf("%d", &option);
+
+        switch (option){
+            case 1:
+                break;
+            case 2:
+                break;
+            case 3:
+                break;
+            case 4:
+                break;
+            case 5:
+                is_connected = 0;
+                printf("Shutting down connection...\n");
+                printf("Goodbye!\n");
+                break;
+            default:
+                printf("Invalid option!\n");
+                break;
+        }
+
+    };
     
     close(cli_socket_descript);
     return 0;
