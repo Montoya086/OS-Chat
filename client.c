@@ -85,6 +85,53 @@ char* parse_user_status(int status){
 void get_all_users_action(char* username){
     if (strlen(username) > 0){
         printf("Getting user %s...\n", username);
+        Chat__UserListRequest user_list_request = CHAT__USER_LIST_REQUEST__INIT;
+        user_list_request.username = username;
+
+        Chat__Request request = CHAT__REQUEST__INIT;
+        request.operation = CHAT__OPERATION__GET_USERS;
+        request.payload_case = CHAT__REQUEST__PAYLOAD_GET_USERS;
+        request.get_users = &user_list_request;
+
+        // Serialize the request
+        size_t req_len = chat__request__get_packed_size(&request);
+        void *req_buffer = malloc(req_len);
+        if (req_buffer == NULL) {
+            printf("Memory allocation failed!\n");
+            exit(EXIT_FAILURE);
+        }
+
+        chat__request__pack(&request, req_buffer);
+
+        // Send the request
+        int bytes_sent = send(cli_socket_descript, req_buffer, req_len, 0);
+        if(bytes_sent<0){
+            printf("Send failed!\n");
+            exit(EXIT_FAILURE);
+        }
+
+        char res_buffer[BUFFER_SIZE];
+        int res = recv(cli_socket_descript, res_buffer, BUFFER_SIZE, 0);
+        if (res < 0) {
+            printf("Receive failed!\n");
+            exit(EXIT_FAILURE);
+        } 
+
+        Chat__Response *response = chat__response__unpack(NULL, res, res_buffer);
+        if (response == NULL) {
+            printf("Error unpacking response\n");
+            exit(EXIT_FAILURE);
+        }
+
+        if (response->status_code == CHAT__STATUS_CODE__OK) {
+            printf("\nMessage: %s\n", response->message);
+            printf("\n");
+            printf("Username: %s\n", response->user_list->users[0]->username);
+            printf("Status: %s\n", parse_user_status(response->user_list->users[0]->status));
+        } else {
+            printf("Error: %s\n", response->message);
+            exit(EXIT_FAILURE);
+        }
     } else {
         printf("Getting all users...\n");
         // Prepare a petition to get all users

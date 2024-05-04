@@ -216,7 +216,6 @@ void set_username_service(CNode *client, char *username) {
 */
 void get_all_users_service(CNode *client, char* username) {
     if (strlen(username) > 0) {
-        printf("Getting user %s...\n", username);
         CNode *current = root_usr;
         while(current) {
             if(strcmp(current->name, username) == 0) {
@@ -256,13 +255,11 @@ void get_all_users_service(CNode *client, char* username) {
             current = current->linked_to;
         }
     } else {
-        printf("Getting all users...\n");
         CNode *current = root_usr;
         Chat__UserListResponse user_list = CHAT__USER_LIST_RESPONSE__INIT;
         Chat__User **users = malloc(sizeof(Chat__User *) * MAX_USERS);
         int i = 0;
         while(current) {
-            printf("User: %s\n", current->name);
             if (strcmp(current->name, "Server") == 0) {
                 current = current->linked_to;
                 continue;
