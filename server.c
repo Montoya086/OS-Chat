@@ -54,6 +54,11 @@ int user_exists(char *username) {
     return 0;
 }
 
+/*
+* Get user count function
+* @return: the number of users
+* This function will be used to get the number of users in the list
+*/
 int get_user_count() {
     CNode *current = root_usr;
     int count = 0;
@@ -174,15 +179,110 @@ void set_username_service(CNode *client, char *username) {
                 printf("Send failed!\n");
                 exit(EXIT_FAILURE);
             }
-        }
+        } else {
 
-        strncpy(client->name, username, MAX_USERNAME_LENGTH);
-        printf("User %s joined the server!\n", client->name);
+            strncpy(client->name, username, MAX_USERNAME_LENGTH);
+            printf("User %s joined the server!\n", client->name);
+
+            Chat__Response response = CHAT__RESPONSE__INIT;
+            response.status_code = CHAT__STATUS_CODE__OK;
+            response.result_case = CHAT__RESPONSE__RESULT__NOT_SET;
+            response.message = "User registered successfully!";
+
+            // Serialize the response
+            size_t res_len = chat__response__get_packed_size(&response);
+            void *res_buffer = malloc(res_len);
+            if (res_buffer == NULL) {
+                printf("Memory allocation failed!\n");
+                exit(EXIT_FAILURE);
+            }
+
+            chat__response__pack(&response, res_buffer);
+
+            // Send the response
+            int bytes_sent = send(client->data, res_buffer, res_len, 0);
+            if (bytes_sent < 0) {
+                printf("Send failed!\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+}
+
+/*
+* Get all users service function
+* @return: void
+* This function will be used to get all the users in the list
+*/
+void get_all_users_service(CNode *client, char* username) {
+    if (strlen(username) > 0) {
+        printf("Getting user %s...\n", username);
+        CNode *current = root_usr;
+        while(current) {
+            if(strcmp(current->name, username) == 0) {
+                Chat__UserListResponse user_list = CHAT__USER_LIST_RESPONSE__INIT;
+                Chat__User **users = malloc(sizeof(Chat__User *) * 1);
+                Chat__User *user = malloc(sizeof(Chat__User));
+                chat__user__init(user);
+                user->username = current->name;
+                user->status = current->status;
+                users[0] = user;
+                user_list.n_users = 1;
+                user_list.users = users;
+
+                Chat__Response response = CHAT__RESPONSE__INIT;
+                response.status_code = CHAT__STATUS_CODE__OK;
+                response.result_case = CHAT__RESPONSE__RESULT_USER_LIST;
+                response.message = "User retrieved successfully!";
+                response.user_list = &user_list;
+
+                // Serialize the response
+                size_t res_len = chat__response__get_packed_size(&response);
+                void *res_buffer = malloc(res_len);
+                if (res_buffer == NULL) {
+                    printf("Memory allocation failed!\n");
+                    exit(EXIT_FAILURE);
+                }
+                chat__response__pack(&response, res_buffer);
+
+                // Send the response
+                int bytes_sent = send(client->data, res_buffer, res_len, 0);
+                if (bytes_sent < 0) {
+                    printf("Send failed!\n");
+                    exit(EXIT_FAILURE);
+                }
+                break;
+            }
+            current = current->linked_to;
+        }
+    } else {
+        printf("Getting all users...\n");
+        CNode *current = root_usr;
+        Chat__UserListResponse user_list = CHAT__USER_LIST_RESPONSE__INIT;
+        Chat__User **users = malloc(sizeof(Chat__User *) * MAX_USERS);
+        int i = 0;
+        while(current) {
+            printf("User: %s\n", current->name);
+            if (strcmp(current->name, "Server") == 0) {
+                current = current->linked_to;
+                continue;
+            }
+            Chat__User *user = malloc(sizeof(Chat__User));
+            chat__user__init(user);
+            user->username = current->name;
+            user->status = current->status;
+            users[i] = user;
+            i++;
+            current = current->linked_to;
+        }
+        user_list.n_users = i;
+        user_list.users = users;
 
         Chat__Response response = CHAT__RESPONSE__INIT;
         response.status_code = CHAT__STATUS_CODE__OK;
-        response.result_case = CHAT__RESPONSE__RESULT__NOT_SET;
-        response.message = "User registered successfully!";
+        response.result_case = CHAT__RESPONSE__RESULT_USER_LIST;
+        response.message = "User list retrieved successfully!";
+        response.user_list = &user_list;
 
         // Serialize the response
         size_t res_len = chat__response__get_packed_size(&response);
@@ -191,7 +291,6 @@ void set_username_service(CNode *client, char *username) {
             printf("Memory allocation failed!\n");
             exit(EXIT_FAILURE);
         }
-
         chat__response__pack(&response, res_buffer);
 
         // Send the response
@@ -201,46 +300,7 @@ void set_username_service(CNode *client, char *username) {
             exit(EXIT_FAILURE);
         }
     }
-}
-
-void send_all_users_service() {
-    CNode *current = root_usr;
-    Chat__UserListResponse user_list = CHAT__USER_LIST_RESPONSE__INIT;
-    Chat__User **users = malloc(sizeof(Chat__User *) * MAX_USERS);
-    int i = 0;
-    while(current) {
-        Chat__User *user = malloc(sizeof(Chat__User));
-        chat__user__init(user);
-        user->username = current->name;
-        user->status = current->status;
-        users[i] = user;
-        i++;
-        current = current->linked_to;
-    }
-    user_list.n_users = i;
-    user_list.users = users;
-
-    Chat__Response response = CHAT__RESPONSE__INIT;
-    response.status_code = CHAT__STATUS_CODE__OK;
-    response.result_case = CHAT__RESPONSE__RESULT_USER_LIST;
-    response.user_list = &user_list;
-
-    // Serialize the response
-    size_t res_len = chat__response__get_packed_size(&response);
-    void *res_buffer = malloc(res_len);
-    if (res_buffer == NULL) {
-        printf("Memory allocation failed!\n");
-        exit(EXIT_FAILURE);
-    }
-
-    chat__response__pack(&response, res_buffer);
-
-    // Send the response
-    int bytes_sent = send(current_usr->data, res_buffer, res_len, 0);
-    if (bytes_sent < 0) {
-        printf("Send failed!\n");
-        exit(EXIT_FAILURE);
-    }
+    
 
 }
 
@@ -325,9 +385,12 @@ void* client_service(void *client_node) {
             case CHAT__OPERATION__REGISTER_USER:
                 set_username_service(client, payload->register_user->username);
                 break;
-            case CHAT__OPERATION__SEND_MESSAGE:             
+            case CHAT__OPERATION__SEND_MESSAGE:    
+
                 break;
             case CHAT__OPERATION__GET_USERS:
+                printf("Get user %s\n", payload->get_users->username);
+                get_all_users_service(client, payload->get_users->username);
                 break;
             case CHAT__OPERATION__UPDATE_STATUS:
                 break;
