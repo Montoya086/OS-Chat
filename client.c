@@ -85,6 +85,7 @@ char* parse_user_status(int status){
 }
 
 void *message_listener(void * arg){
+    pthread_detach(pthread_self());
     while (is_connected){
         char res_buffer[BUFFER_SIZE];
         int res = recv(cli_socket_descript, res_buffer, BUFFER_SIZE, 0);
@@ -103,11 +104,17 @@ void *message_listener(void * arg){
         if (response->status_code == CHAT__STATUS_CODE__OK) {
             if (response->operation == CHAT__OPERATION__INCOMING_MESSAGE){
                 if (response->incoming_message->type == CHAT__MESSAGE_TYPE__BROADCAST){
-                    printf("\n\033[0;32mGLOBAL\033[0m - Message from %s: %s\n\n", response->incoming_message->sender, response->incoming_message->content);
+                    printf("\n\033[0;35mGLOBAL\033[0m - Message from %s: %s\n\n", response->incoming_message->sender, response->incoming_message->content);
                 } else {
                     printf("\n\033[0;34mPRIVATE\033[0m - Message from %s: %s\n\n", response->incoming_message->sender, response->incoming_message->content);
                 }
             } 
+
+            if (response->operation == CHAT__OPERATION__SEND_MESSAGE){
+                if (strlen(response->message) > 0){
+                    printf("%s\n", response->message);
+                } 
+            }
             
         } else {
             if (strlen(response->message) > 0){
@@ -117,6 +124,60 @@ void *message_listener(void * arg){
                 exit(EXIT_FAILURE);
             }
         }
+    }
+}
+
+int check_user_status(char* username){
+    Chat__UserListRequest user_list_request = CHAT__USER_LIST_REQUEST__INIT;
+    user_list_request.username = username;
+
+    Chat__Request request = CHAT__REQUEST__INIT;
+    request.operation = CHAT__OPERATION__GET_USERS;
+    request.payload_case = CHAT__REQUEST__PAYLOAD_GET_USERS;
+    request.get_users = &user_list_request;
+
+    // Serialize the request
+    size_t req_len = chat__request__get_packed_size(&request);
+    void *req_buffer = malloc(req_len);
+    if (req_buffer == NULL) {
+        printf("Memory allocation failed!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    chat__request__pack(&request, req_buffer);
+
+    // Send the request
+    int bytes_sent = send(cli_socket_descript, req_buffer, req_len, 0);
+    if(bytes_sent<0){
+        printf("Send failed!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    char res_buffer[BUFFER_SIZE];
+    int res = recv(cli_socket_descript, res_buffer, BUFFER_SIZE, 0);
+    if (res < 0) {
+        printf("Receive failed!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    Chat__Response *response = chat__response__unpack(NULL, res, res_buffer);
+    if (response == NULL) {
+        printf("Error unpacking response\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (response->status_code == CHAT__STATUS_CODE__OK) {
+        return response->user_list->users[0]->status;
+        if (response->user_list->users[0]->status == CHAT__USER_STATUS__ONLINE){
+            return 1;
+        } else if (response->user_list->users[0]->status == CHAT__USER_STATUS__BUSY){
+            return 2;
+        } else {
+            return 3;
+        }
+    } else {
+        printf("Error: %s\n", response->message);
+        return -1;
     }
 }
 
@@ -263,6 +324,34 @@ void send_message_action(char* message){
     }
 }
 
+void change_status_action (Chat__UserStatus status){
+    Chat__UpdateStatusRequest change_status_request = CHAT__UPDATE_STATUS_REQUEST__INIT;
+    change_status_request.new_status = status;
+    change_status_request.username = cli_name;
+
+    Chat__Request request = CHAT__REQUEST__INIT;
+    request.operation = CHAT__OPERATION__UPDATE_STATUS;
+    request.payload_case = CHAT__REQUEST__PAYLOAD_UPDATE_STATUS;
+    request.update_status = &change_status_request;
+
+    // Serialize the request
+    size_t req_len = chat__request__get_packed_size(&request);
+    void *req_buffer = malloc(req_len);
+    if (req_buffer == NULL) {
+        printf("Memory allocation failed!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    chat__request__pack(&request, req_buffer);
+
+    // Send the request
+    int bytes_sent = send(cli_socket_descript, req_buffer, req_len, 0);
+    if(bytes_sent<0){
+        printf("Send failed!\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
 /*
 * Main function
 * @param argc: number of arguments
@@ -328,7 +417,7 @@ int main(int argc, char *argv[]){
     // Main loop
     while (is_connected){
         if (channel == CHAT__MESSAGE_TYPE__BROADCAST){
-            printf("\nYou are in the \033[0;32mGLOBAL\033[0m channel\n");
+            printf("\nYou are in the \033[0;35mGLOBAL\033[0m channel\n");
         } else {
             printf("\nYou are in the \033[0;34mPRIVATE\033[0m channel with %s\n", current_chat);
         }
@@ -343,8 +432,9 @@ int main(int argc, char *argv[]){
 
         switch (option){
             case 1:
-                printf("Welcome to the chatroom!\n");
-                printf("You are sending messages to the %s channel\n", channel == CHAT__MESSAGE_TYPE__BROADCAST ? "\033[0;32mGLOBAL\033[0m" : "\033[0;34mPRIVATE\033[0m");
+                change_status_action(CHAT__USER_STATUS__ONLINE);
+                printf("Welcome to the chatroom! Your status is now \033[0;32mONLINE\033[0m\n");
+                printf("You are sending messages to the %s channel\n", channel == CHAT__MESSAGE_TYPE__BROADCAST ? "\033[0;35mGLOBAL\033[0m" : "\033[0;34mPRIVATE\033[0m");
                 printf("You can leave the chatroom by typing '--exit'\n");
                 pthread_t listener_thread;
                 pthread_create(&listener_thread, NULL, message_listener, NULL);
@@ -366,6 +456,8 @@ int main(int argc, char *argv[]){
                     
                 }
                 printf("Leaving chatroom...\n");
+                change_status_action(CHAT__USER_STATUS__OFFLINE);
+                printf("Your status is now \033[0;31mOFFLINE\033[0m\n");
                 break;
             case 2:
                 printf("Do you want to get all users? (y/n)\n");
@@ -386,13 +478,17 @@ int main(int argc, char *argv[]){
                 scanf(" %c", &answer2);
                 if (answer2 == 'y'){
                     channel = CHAT__MESSAGE_TYPE__BROADCAST;
-                    printf("Changing to \033[0;32mGLOBAL\033[0m channel\n");
+                    printf("Changing to \033[0;35mGLOBAL\033[0m channel\n");
                 } else {
                     printf("Type the username of the user you want to chat with\n");
                     char username[MAX_USERNAME_LENGTH];
                     scanf("%s", username);
                     char* user = get_all_users_action(username);
                     if (strlen(user) > 0){
+                        if (strcmp(user, cli_name) == 0){
+                            printf("You can't chat with yourself!\n");
+                            continue;
+                        }
                         printf("Changing to \033[0;34mPRIVATE\033[0m channel with %s\n", user);
                         channel = CHAT__MESSAGE_TYPE__DIRECT;
                         strcpy(current_chat, username);
