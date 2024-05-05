@@ -328,9 +328,9 @@ int main(int argc, char *argv[]){
     // Main loop
     while (is_connected){
         if (channel == CHAT__MESSAGE_TYPE__BROADCAST){
-            printf("\nYou are in the public channel\n");
+            printf("\nYou are in the \033[0;32mGLOBAL\033[0m channel\n");
         } else {
-            printf("\nYou are in the private channel with %s\n", current_chat);
+            printf("\nYou are in the \033[0;34mPRIVATE\033[0m channel with %s\n", current_chat);
         }
         printf("\nSelect an option:\n");
         printf("1. Join chatroom\n");
@@ -344,7 +344,7 @@ int main(int argc, char *argv[]){
         switch (option){
             case 1:
                 printf("Welcome to the chatroom!\n");
-                printf("You are sending messages to the %s channel\n", channel == CHAT__MESSAGE_TYPE__BROADCAST ? "global" : "private");
+                printf("You are sending messages to the %s channel\n", channel == CHAT__MESSAGE_TYPE__BROADCAST ? "\033[0;32mGLOBAL\033[0m" : "\033[0;34mPRIVATE\033[0m");
                 printf("You can leave the chatroom by typing '--exit'\n");
                 pthread_t listener_thread;
                 pthread_create(&listener_thread, NULL, message_listener, NULL);
@@ -386,13 +386,14 @@ int main(int argc, char *argv[]){
                 scanf(" %c", &answer2);
                 if (answer2 == 'y'){
                     channel = CHAT__MESSAGE_TYPE__BROADCAST;
+                    printf("Changing to \033[0;32mGLOBAL\033[0m channel\n");
                 } else {
                     printf("Type the username of the user you want to chat with\n");
                     char username[MAX_USERNAME_LENGTH];
                     scanf("%s", username);
                     char* user = get_all_users_action(username);
                     if (strlen(user) > 0){
-                        printf("Changing to private channel with %s\n", user);
+                        printf("Changing to \033[0;34mPRIVATE\033[0m channel with %s\n", user);
                         channel = CHAT__MESSAGE_TYPE__DIRECT;
                         strcpy(current_chat, username);
                     } else {
