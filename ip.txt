@@ -1,2 +1,2 @@
-EC2 Public IP: 52.200.122.175 
+EC2 Public IP: 3.94.165.204
 Port: 8080
