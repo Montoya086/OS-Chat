@@ -358,6 +358,34 @@ void change_status_action (Chat__UserStatus status){
     }
 }
 
+void client_disconnect_action() {
+    Chat__User user_payload = CHAT__USER__INIT;
+    user_payload.username = cli_name;
+    user_payload.status = CHAT__USER_STATUS__OFFLINE;
+
+    Chat__Request request = CHAT__REQUEST__INIT;
+    request.operation = CHAT__OPERATION__UNREGISTER_USER;
+    request.payload_case = CHAT__REQUEST__PAYLOAD_UNREGISTER_USER;
+    request.unregister_user = &user_payload;
+
+    // Serialize the request
+    size_t req_len = chat__request__get_packed_size(&request);
+    void *req_buffer = malloc(req_len);
+    if (req_buffer == NULL) {
+        printf("Memory allocation failed!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    chat__request__pack(&request, req_buffer);
+
+    // Send the request
+    int bytes_sent = send(cli_socket_descript, req_buffer, req_len, 0);
+    if(bytes_sent<0){
+        printf("Send failed!\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
 /*
 * Main function
 * @param argc: number of arguments
@@ -505,6 +533,7 @@ int main(int argc, char *argv[]){
                 break;
             case 4:
                 is_connected = 0;
+                client_disconnect_action();
                 printf("Shutting down connection...\n");
                 printf("Goodbye!\n");
                 break;

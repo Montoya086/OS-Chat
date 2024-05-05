@@ -593,6 +593,17 @@ void change_status_service(Chat__UserStatus status, char *username) {
     }
 }
 
+void unregister_user_service(char *username) {
+    CNode *current = root_usr;
+    while(current) {
+        if(strcmp(current->name, username) == 0) {
+            remove_client_service(current);
+            break;
+        }
+        current = current->linked_to;
+    }
+}
+
 /*
 * Client service function
 * @param client_node: the client node
@@ -652,6 +663,7 @@ void* client_service(void *client_node) {
                 change_status_service(payload->update_status->new_status, payload->update_status->username);
                 break;
             case CHAT__OPERATION__UNREGISTER_USER:
+                unregister_user_service(payload->unregister_user->username);
                 break;
             default:
                 break;
