@@ -16,6 +16,11 @@ In order to compile use the following:
 ```
 gcc <server/client>.c chat.pb-c.c -o <server/client>.o -lprotobuf-c
 ```
+OR
+```
+bash compile.sh
+```
+
 In order to run the server use the following:
 ```
 ./server.o <port>
