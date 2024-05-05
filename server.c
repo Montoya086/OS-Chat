@@ -112,7 +112,7 @@ void exit_service(int signal) {
 void* status_service(void *client_node) {
     CNode *client = (CNode *) client_node;
     while(client->active) {
-        if(client->status != CHAT__USER_STATUS__BUSY) {
+        if(client->status == CHAT__USER_STATUS__ONLINE) {
             if((clock()-client->last_seen)/CLOCKS_PER_SEC > MAX_INACTIVE_TIME) {
                 // Block the mutex while changing the status
                 pthread_mutex_lock(&status_mutex);
@@ -217,8 +217,11 @@ void set_username_service(CNode *client, char *username) {
 void get_all_users_service(CNode *client, char* username) {
     if (strlen(username) > 0) {
         CNode *current = root_usr;
+        int found = 0;
         while(current) {
             if(strcmp(current->name, username) == 0) {
+                found = 1;
+                printf("User %s found\n", username);
                 Chat__UserListResponse user_list = CHAT__USER_LIST_RESPONSE__INIT;
                 Chat__User **users = malloc(sizeof(Chat__User *) * 1);
                 Chat__User *user = malloc(sizeof(Chat__User));
@@ -242,6 +245,8 @@ void get_all_users_service(CNode *client, char* username) {
                     printf("Memory allocation failed!\n");
                     exit(EXIT_FAILURE);
                 }
+                printf("User %s retrieved successfully!\n", username);
+
                 chat__response__pack(&response, res_buffer);
 
                 // Send the response
@@ -250,9 +255,33 @@ void get_all_users_service(CNode *client, char* username) {
                     printf("Send failed!\n");
                     exit(EXIT_FAILURE);
                 }
+                printf("User %s sent successfully!\n", username);
                 break;
             }
             current = current->linked_to;
+        }
+        if (!found) {
+            Chat__Response response = CHAT__RESPONSE__INIT;
+            response.status_code = CHAT__STATUS_CODE__BAD_REQUEST;
+            response.result_case = CHAT__RESPONSE__RESULT__NOT_SET;
+            response.message = "User not found!";
+
+            // Serialize the response
+            size_t res_len = chat__response__get_packed_size(&response);
+            void *res_buffer = malloc(res_len);
+            if (res_buffer == NULL) {
+                printf("Memory allocation failed!\n");
+                exit(EXIT_FAILURE);
+            }
+
+            chat__response__pack(&response, res_buffer);
+
+            // Send the response
+            int bytes_sent = send(client->data, res_buffer, res_len, 0);
+            if (bytes_sent < 0) {
+                printf("Send failed!\n");
+                exit(EXIT_FAILURE);
+            }
         }
     } else {
         CNode *current = root_usr;
@@ -330,6 +359,136 @@ void remove_client_service(CNode *to_remove) {
     pthread_mutex_unlock(&client_mutex);
 }
 
+void send_message_service(CNode *client, char *recipient, char *content) {
+    if (strlen(recipient) == 0 ) {
+        // Send the message to all users
+        CNode *current = root_usr;
+        while(current) {
+            if (strcmp(current->name, "Server") == 0 || strcmp(current->name, client->name) == 0){
+                current = current->linked_to;
+                continue;
+            }
+            
+            Chat__IncomingMessageResponse message = CHAT__INCOMING_MESSAGE_RESPONSE__INIT;
+            message.sender = client->name;
+            message.content = content;
+            message.type = CHAT__MESSAGE_TYPE__BROADCAST;
+
+            Chat__Response response = CHAT__RESPONSE__INIT;
+            response.status_code = CHAT__STATUS_CODE__OK;
+            response.result_case = CHAT__RESPONSE__RESULT_INCOMING_MESSAGE;
+            response.operation = CHAT__OPERATION__INCOMING_MESSAGE;
+            response.message = "Message sent successfully!";
+            response.incoming_message = &message;
+
+            // Serialize the response
+            size_t res_len = chat__response__get_packed_size(&response);
+            void *res_buffer = malloc(res_len);
+            if (res_buffer == NULL) {
+                printf("Memory allocation failed!\n");
+                exit(EXIT_FAILURE);
+            }
+
+            chat__response__pack(&response, res_buffer);
+
+            // Send the response
+            int bytes_sent = send(current->data, res_buffer, res_len, 0);
+            if (bytes_sent < 0) {
+                printf("Send failed!\n");
+                exit(EXIT_FAILURE);
+            }
+            
+            current = current->linked_to;
+        }
+    } else {
+        // Send the message to the recipient
+
+        // Check if the recipient exists
+        if (user_exists(recipient)) {
+            CNode *current = root_usr;
+            while(current) {
+                if(strcmp(current->name, recipient) == 0) {
+                    Chat__IncomingMessageResponse message = CHAT__INCOMING_MESSAGE_RESPONSE__INIT;
+                    message.sender = client->name;
+                    message.content = content;
+                    message.type = CHAT__MESSAGE_TYPE__DIRECT;
+
+                    Chat__Response response = CHAT__RESPONSE__INIT;
+                    response.status_code = CHAT__STATUS_CODE__OK;
+                    response.result_case = CHAT__RESPONSE__RESULT_INCOMING_MESSAGE;
+                    response.operation = CHAT__OPERATION__INCOMING_MESSAGE;
+                    response.message = "Message sent successfully!";
+                    response.incoming_message = &message;
+
+                    // Serialize the response
+                    size_t res_len = chat__response__get_packed_size(&response);
+                    void *res_buffer = malloc(res_len);
+                    if (res_buffer == NULL) {
+                        printf("Memory allocation failed!\n");
+                        exit(EXIT_FAILURE);
+                    }
+
+                    chat__response__pack(&response, res_buffer);
+
+                    // Send the response
+                    int bytes_sent = send(current->data, res_buffer, res_len, 0);
+                    if (bytes_sent < 0) {
+                        printf("Send failed!\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    break;
+                }
+                current = current->linked_to;
+            }
+        } else {
+            Chat__Response response = CHAT__RESPONSE__INIT;
+            response.status_code = CHAT__STATUS_CODE__BAD_REQUEST;
+            response.result_case = CHAT__RESPONSE__RESULT__NOT_SET;
+            response.message = "Recipient not found!";
+
+            // Serialize the response
+            size_t res_len = chat__response__get_packed_size(&response);
+            void *res_buffer = malloc(res_len);
+            if (res_buffer == NULL) {
+                printf("Memory allocation failed!\n");
+                exit(EXIT_FAILURE);
+            }
+
+            chat__response__pack(&response, res_buffer);
+
+            // Send the response
+            int bytes_sent = send(client->data, res_buffer, res_len, 0);
+            if (bytes_sent < 0) {
+                printf("Send failed!\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+
+    // Respond to the sender
+    Chat__Response response = CHAT__RESPONSE__INIT;
+    response.status_code = CHAT__STATUS_CODE__OK;
+    response.result_case = CHAT__RESPONSE__RESULT__NOT_SET;
+    response.message = "Message sent successfully!";
+
+    // Serialize the response
+    size_t res_len = chat__response__get_packed_size(&response);
+    void *res_buffer = malloc(res_len);
+    if (res_buffer == NULL) {
+        printf("Memory allocation failed!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    chat__response__pack(&response, res_buffer);
+
+    // Send the response
+    int bytes_sent = send(client->data, res_buffer, res_len, 0);
+    if (bytes_sent < 0) {
+        printf("Send failed!\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
 /*
 * Client service function
 * @param client_node: the client node
@@ -375,15 +534,14 @@ void* client_service(void *client_node) {
             client->status = CHAT__USER_STATUS__ONLINE;
         }
 
-        reset_status(client);
-
         switch (payload->operation)
         {
             case CHAT__OPERATION__REGISTER_USER:
                 set_username_service(client, payload->register_user->username);
                 break;
             case CHAT__OPERATION__SEND_MESSAGE:    
-
+                reset_status(client);
+                send_message_service(client, payload->send_message->recipient, payload->send_message->content);
                 break;
             case CHAT__OPERATION__GET_USERS:
                 printf("Get user %s\n", payload->get_users->username);

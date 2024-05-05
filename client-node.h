@@ -24,7 +24,7 @@ CNode *create_node(int socket, char *ip, char *name) {
     node->data = socket;
     node->linked_to = NULL;
     node->linked_from = NULL;
-    node->status = CHAT__USER_STATUS__ONLINE;
+    node->status = CHAT__USER_STATUS__OFFLINE;
     strncpy(node->ip, ip, 16);
     if (name) {
         strncpy(node->name, name, 20);
