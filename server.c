@@ -265,8 +265,10 @@ void set_username_service(CNode *client, char *username) {
 */
 void get_all_users_service(CNode *client, char* username) {
     if (strlen(username) > 0) {
+        printf("Get user %s\n", username);
         CNode *current = root_usr;
         int found = 0;
+        printf("Searching in users...\n");
         while(current) {
             if(strcmp(current->name, username) == 0) {
                 found = 1;
@@ -310,6 +312,7 @@ void get_all_users_service(CNode *client, char* username) {
             current = current->linked_to;
         }
         if (!found) {
+            printf("User %s not found\n", username);
             Chat__Response response = CHAT__RESPONSE__INIT;
             response.status_code = CHAT__STATUS_CODE__BAD_REQUEST;
             response.result_case = CHAT__RESPONSE__RESULT__NOT_SET;
@@ -333,10 +336,12 @@ void get_all_users_service(CNode *client, char* username) {
             }
         }
     } else {
+        printf("Get all users\n");
         CNode *current = root_usr;
         Chat__UserListResponse user_list = CHAT__USER_LIST_RESPONSE__INIT;
         Chat__User **users = malloc(sizeof(Chat__User *) * MAX_USERS);
         int i = 0;
+        printf("Searching in users...\n");
         while(current) {
             if (strcmp(current->name, "Server") == 0) {
                 current = current->linked_to;
@@ -350,6 +355,7 @@ void get_all_users_service(CNode *client, char* username) {
             i++;
             current = current->linked_to;
         }
+        printf("Users retrieved successfully!\n");
         user_list.n_users = i;
         user_list.users = users;
 
@@ -375,7 +381,7 @@ void get_all_users_service(CNode *client, char* username) {
             exit(EXIT_FAILURE);
         }
     }
-    
+    printf("User list sent successfully!\n");
 
 }
 
@@ -584,8 +590,10 @@ void change_status_service(Chat__UserStatus status, char *username) {
     CNode *current = root_usr;
     while(current) {
         if(strcmp(current->name, username) == 0) {
+            pthread_mutex_lock(&status_mutex);
             current->status = status;
             current->last_seen = clock();
+            pthread_mutex_unlock(&status_mutex);
             printf("User %s status changed to %s\n", username, parse_user_status(status));
             break;
         }

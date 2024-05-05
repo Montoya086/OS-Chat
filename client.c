@@ -474,7 +474,7 @@ int main(int argc, char *argv[]){
                 pthread_create(&listener_thread, NULL, message_listener, NULL);
                 if (pthread_detach(listener_thread) != 0) {
                     printf("Thread creation failed!\n");
-                    exit(EXIT_FAILURE);
+                    continue;
                 }
                 printf("Type your messages:\n");
                 char message[MAX_MESSAGE_LENGTH];
