@@ -31,10 +31,37 @@ CNode *root_usr = NULL, *current_usr = NULL;
 */
 void reset_status(CNode *client) {
     // Block the mutex while changing the status
+    Chat__UserStatus old_status = client->status;
     pthread_mutex_lock(&status_mutex);
     client->status = CHAT__USER_STATUS__ONLINE;
     client->last_seen = clock();
     pthread_mutex_unlock(&status_mutex);
+
+    if (old_status == CHAT__USER_STATUS__ONLINE) {
+        return;
+    }
+    Chat__Response response = CHAT__RESPONSE__INIT;
+    response.status_code = CHAT__STATUS_CODE__OK;
+    response.result_case = CHAT__RESPONSE__RESULT__NOT_SET;
+    response.operation = CHAT__OPERATION__UPDATE_STATUS;
+    response.message ="\033[0;33mWARNING!\033[0m Status changed to \033[0;32mACTIVE\033[0m!";
+
+    // Serialize the response
+    size_t res_len = chat__response__get_packed_size(&response);
+    void *res_buffer = malloc(res_len);
+    if (res_buffer == NULL) {
+        printf("Memory allocation failed!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    chat__response__pack(&response, res_buffer);
+
+    // Send the response
+    int bytes_sent = send(client->data, res_buffer, res_len, 0);
+    if (bytes_sent < 0) {
+        printf("Send failed!\n");
+        exit(EXIT_FAILURE);
+    }
 }
 
 /*
@@ -118,7 +145,29 @@ void* status_service(void *client_node) {
                 pthread_mutex_lock(&status_mutex);
                 client->status = CHAT__USER_STATUS__BUSY;
                 pthread_mutex_unlock(&status_mutex);
-                printf("User %s is now busy!\n", client->name);
+                
+                Chat__Response response = CHAT__RESPONSE__INIT;
+                response.status_code = CHAT__STATUS_CODE__OK;
+                response.result_case = CHAT__RESPONSE__RESULT__NOT_SET;
+                response.operation = CHAT__OPERATION__UPDATE_STATUS;
+                response.message = "\033[0;33mWARNING!\033[0m Status changed to \033[0;36mBUSY\033[0m due to inactivity!";
+
+                // Serialize the response
+                size_t res_len = chat__response__get_packed_size(&response);
+                void *res_buffer = malloc(res_len);
+                if (res_buffer == NULL) {
+                    printf("Memory allocation failed!\n");
+                    exit(EXIT_FAILURE);
+                }
+
+                chat__response__pack(&response, res_buffer);
+
+                // Send the response
+                int bytes_sent = send(client->data, res_buffer, res_len, 0);
+                if (bytes_sent < 0) {
+                    printf("Send failed!\n");
+                    exit(EXIT_FAILURE);
+                }
             }
         }
     }

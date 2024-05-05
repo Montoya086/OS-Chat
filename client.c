@@ -115,6 +115,12 @@ void *message_listener(void * arg){
                     printf("%s\n", response->message);
                 } 
             }
+
+            if (response->operation == CHAT__OPERATION__UPDATE_STATUS){
+                if (strlen(response->message) > 0){
+                    printf("%s\n", response->message);
+                } 
+            }
             
         } else {
             if (strlen(response->message) > 0){
