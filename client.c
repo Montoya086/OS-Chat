@@ -17,6 +17,7 @@ int is_connected = 0;
 char cli_name[MAX_USERNAME_LENGTH] = {};
 Chat__MessageType channel = CHAT__MESSAGE_TYPE__BROADCAST;
 char current_chat[MAX_USERNAME_LENGTH] = {};
+int cli_status = CHAT__USER_STATUS__OFFLINE;
 
 void exit_service(int signal) {
     printf("\nShutting down...\n");
@@ -76,9 +77,9 @@ char* parse_user_status(int status){
         case CHAT__USER_STATUS__ONLINE:
             return "Active";
         case CHAT__USER_STATUS__BUSY:
-            return "Inactive";
+            return "Busy";
         case CHAT__USER_STATUS__OFFLINE:
-            return "Away";
+            return "Inactivo";
         default:
             return "Unknown";
     }
@@ -386,6 +387,45 @@ void client_disconnect_action() {
     }
 }
 
+void view_and_change_status() {
+    // Display current status
+    printf("Your current status is: %s\n", parse_user_status(cli_status));
+
+    // Ask if user wants to change status
+    printf("Do you want to change your status? (y/n)\n");
+    char choice;
+    scanf(" %c", &choice);
+
+    if (choice == 'y' || choice == 'Y') {
+        printf("Select your new status:\n");
+        printf("1. Online\n");
+        printf("2. Busy\n");
+        printf("3. Offline\n");
+        printf("Enter your choice: ");
+        int new_status_choice;
+        scanf("%d", &new_status_choice);
+
+        Chat__UserStatus new_status;
+        switch (new_status_choice) {
+            case 1:
+                new_status = CHAT__USER_STATUS__ONLINE;
+                break;
+            case 2:
+                new_status = CHAT__USER_STATUS__BUSY;
+                break;
+            case 3:
+                new_status = CHAT__USER_STATUS__OFFLINE;
+                break;
+            default:
+                printf("Invalid choice, no changes made.\n");
+                return;
+        }
+
+        change_status_action(new_status);
+        printf("Status updated successfully!\n");
+    }
+}
+
 /*
 * Main function
 * @param argc: number of arguments
@@ -459,7 +499,8 @@ int main(int argc, char *argv[]){
         printf("1. Join chatroom\n");
         printf("2. List users\n");
         printf("3. Change channel\n");
-        printf("4. Exit\n");
+        printf("4. View and change my status\n");
+        printf("5. Exit\n");
 
         int option;
         scanf("%d", &option);
@@ -531,7 +572,12 @@ int main(int argc, char *argv[]){
                     }
                 }
                 break;
+
             case 4:
+                view_and_change_status();
+                break;
+
+            case 5:
                 is_connected = 0;
                 client_disconnect_action();
                 printf("Shutting down connection...\n");
