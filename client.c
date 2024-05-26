@@ -357,6 +357,28 @@ void change_status_action (Chat__UserStatus status){
         printf("Send failed!\n");
         exit(EXIT_FAILURE);
     }
+
+    cli_status = status;
+
+    char res_buffer[BUFFER_SIZE];
+    int res = recv(cli_socket_descript, res_buffer, BUFFER_SIZE, 0);
+    if (res < 0) {
+        printf("Receive failed!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    Chat__Response *response = chat__response__unpack(NULL, res, res_buffer);
+    if (response == NULL) {
+        printf("Error unpacking response\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (response->status_code == CHAT__STATUS_CODE__OK) {
+        printf("Message: %s\n", response->message);
+    } else {
+        printf("Error: %s\n", response->message);
+        exit(EXIT_FAILURE);
+    }
 }
 
 void client_disconnect_action() {
@@ -424,6 +446,7 @@ void view_and_change_status() {
         change_status_action(new_status);
         printf("Status updated successfully!\n");
     }
+    
 }
 
 /*
