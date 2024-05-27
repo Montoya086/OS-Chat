@@ -520,10 +520,11 @@ int main(int argc, char *argv[]){
         }
         printf("\nSelect an option:\n");
         printf("1. Join chatroom\n");
-        printf("2. List users\n");
-        printf("3. Change channel\n");
-        printf("4. View and change my status\n");
-        printf("5. Exit\n");
+        printf("2. User's guide\n");
+        printf("3. List users\n");
+        printf("4. Change channel\n");
+        printf("5. View and change my status\n");
+        printf("6. Exit\n");
 
         int option;
         scanf("%d", &option);
@@ -558,6 +559,46 @@ int main(int argc, char *argv[]){
                 printf("Your status is now \033[0;31mOFFLINE\033[0m\n");
                 break;
             case 2:
+                printf("-----------------------------------------------------------------------------\n");
+                printf("\n1.  Join the Chat\n\n");
+                printf("Description: Allows you to join the chat and start sending messages.\n");
+                printf("How to use it:\n");
+                printf("\tSelect option 1 from the main menu.\n ");
+                printf("\tAutomatically, your status will be changed to 'Online'.\n");
+                printf("\tYou can start sending messages to the active channel (Global or Private).\n");
+                printf("\tTo exit the chat and return to the main menu, type --exit.\n\n");
+                printf("\n3. List Users\n\n");
+                printf("Description: Displays a list of all online users or allows you to search for a specific user\n");
+                printf("How to use it:\n");
+                printf("\tYou will be asked if you want to see all users or search for a specific user:\n");
+                printf("\t\tIf you choose to view all, a list of user names and statuses will be displayed.\n");
+                printf("\t\tIf you choose to search for a specific user, you will need to enter the name of the desired user.\n\n");
+                printf("\n4. Change Channel\n\n");
+                printf("Description: Allows you to switch between the global channel or start a private chat with another user.\n");
+                printf("How to use it:\n");
+                printf("\t Select option 4 from the main menu.\n");
+                printf("\t You will be asked if you want to switch to the global channel or set up a private channel:\n");
+                printf("\t\tIf you choose the global channel, you will be informed that the channel has changed to 'Global'.\n");
+                printf("\t\tIf you prefer a private channel, you will need to enter the name of the user you wish to chat with.\n");
+                printf("\t\tIf the user is valid and different from you, the channel will change to a private chat with that user.\n\n");
+                printf("\n5. View and Change My Status\n\n");
+                printf("Description: allows you to view your current status and change it according to your preference.\n");
+                printf("How to use it:\n");
+                printf("\tSelect option 5 from the main menu.\n");
+                printf("\tYour current status will be displayed.\n");
+                printf("\tIf you wish to change it, answer yes to the question and select the new status from the options provided:\n");
+                printf("\t\t 1 for 'Online'.\n");
+                printf("\t\t 2 for 'Busy'.\n");
+                printf("\t\t 3 for 'Inactive'.\n");
+                printf("\tConfirm your selection and your status will be updated.\n\n");
+                printf("\n6. Logout\n\n");
+                printf("Description: Logs out of the chat and terminates the connection to the server.\n");
+                printf("How to use it:\n");
+                printf("\tSelect option 6 from the main menu.\n");
+                printf("\tThe connection will be securely closed and the program will be terminated.\n");
+                printf("-----------------------------------------------------------------------------\n");
+                break;
+            case 3:
                 printf("Do you want to get all users? (y/n)\n");
                 char answer;
                 scanf(" %c", &answer);
@@ -570,7 +611,7 @@ int main(int argc, char *argv[]){
                     get_all_users_action(username);
                 }
                 break;
-            case 3:
+            case 4:
                 printf("Do you want to change the global channel? (y/n)\n");
                 char answer2;
                 scanf(" %c", &answer2);
@@ -596,11 +637,11 @@ int main(int argc, char *argv[]){
                 }
                 break;
 
-            case 4:
+            case 5:
                 view_and_change_status();
                 break;
 
-            case 5:
+            case 6:
                 is_connected = 0;
                 client_disconnect_action();
                 printf("Shutting down connection...\n");
