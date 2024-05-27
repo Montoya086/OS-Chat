@@ -277,7 +277,10 @@ void get_all_users_service(CNode *client, char* username) {
                 Chat__User **users = malloc(sizeof(Chat__User *) * 1);
                 Chat__User *user = malloc(sizeof(Chat__User));
                 chat__user__init(user);
-                user->username = current->name;
+                // Concat the user ip before the name
+                char user_ip[MAX_USERNAME_LENGTH+16+4];
+                snprintf(user_ip, sizeof(user_ip), "%s (%s)", current->name, current->ip);
+                user->username = user_ip;
                 user->status = current->status;
                 users[0] = user;
                 user_list.n_users = 1;
@@ -411,7 +414,7 @@ void remove_client_service(CNode *to_remove) {
     close(to_remove->data);
     // Change the status to inactive to stop the status service 
     to_remove->active = 0; 
-    printf("Connection closed for %s\n", to_remove->name);
+    printf("User removed %s\n", to_remove->name);
     // Free the memory
     free(to_remove); 
     // Unlock the mutex
@@ -666,11 +669,11 @@ void* client_service(void *client_node) {
         int raw_payload = recv(client->data, payload_buffer, MAX_MESSAGE_LENGTH, 0);
         // Check if the message is received successfully
         if (raw_payload == -1) {
-            printf("Receiving message failed!\n");
+            printf("Connection lost for %s\n", client->name);
             return NULL;
         } else if (raw_payload == 0) { // Check if the client disconnected
             remove_client_service(client);
-            break;
+            return NULL;
         } 
 
         // Parse the received message
